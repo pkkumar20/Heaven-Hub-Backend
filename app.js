@@ -59,6 +59,9 @@ app.use(passport.initialize());
 app.use(passport.session());
 // Routes
 // hometels routes
+app.get("/", (req, res) => {
+  res.status(200).json({message:"working"})
+})
 const hometelRoutes = require("./Routes/hometel")(io);
 app.use("/api/listing", hometelRoutes);
 app.use("/api/user/", dataRoutes);
