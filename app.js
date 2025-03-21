@@ -41,13 +41,13 @@ const sessionOptions = {
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173", // ✅ React frontend (Update if different)
+    origin: "https://www.heven-hub.site/", // ✅ React frontend (Update if different)
     methods: ["GET", "POST", "PATCH"],
     credentials: true,
   },
 });
 
-app.use(cors({ origin: "http://localhost:5173", credentials: true }));
+app.use(cors({ origin: "https://www.heven-hub.site/", credentials: true }));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
