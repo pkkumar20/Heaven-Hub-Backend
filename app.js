@@ -47,7 +47,14 @@ const io = new Server(server, {
   },
 });
 
-app.use(cors({ origin: "*", credentials: true }));
+app.use(
+  cors({
+    origin: "*", // ✅ Allow all origins
+    credentials: true, // ✅ Allow cookies & headers
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
