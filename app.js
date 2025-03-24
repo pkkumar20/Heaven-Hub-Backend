@@ -50,7 +50,10 @@ const io = new Server(server, {
   },
 });
 
-app.use(cors({ origin: "https://www.heven-hub.site/", credentials: true }));
+app.use(cors({ origin: [
+  "https://heaven-hub-frontend-1.onrender.com",
+  "https://heaven-hub.site",
+], credentials: true }));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
