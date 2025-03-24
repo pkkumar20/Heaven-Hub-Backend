@@ -41,7 +41,7 @@ const sessionOptions = {
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "*", // ✅ React frontend (Update if different)
+    origin: ["http://localhost:3000", "https://heaven-hub.site","https://heaven-hub-frontend-1.onrender.com"], // ✅ React frontend (Update if different)
     methods: ["GET", "POST", "PATCH"],
     credentials: true,
   },
@@ -49,24 +49,24 @@ const io = new Server(server, {
 
 app.use(
   cors({
-    origin: "*", // ✅ Allows ALL frontend domains
+    origin: ["http://localhost:3000", "https://heaven-hub.site","https://heaven-hub-frontend-1.onrender.com"], // ✅ Allow localhost & live frontend
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true, // ✅ Important for cookies & sessions
   })
 );
 
-// ✅ Allow all requests by setting proper headers
+// ✅ Ensure headers are set for all responses
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*"); // 🔥 Fully open CORS
+  res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
   res.header("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization, Accept");
   res.header("Access-Control-Allow-Credentials", "true");
-  
+
   if (req.method === "OPTIONS") {
     return res.sendStatus(200);
   }
-  
+
   next();
 });
 
@@ -159,6 +159,6 @@ io.on("connection", (socket) => {
 
 
 // Start Express Server
-server.listen(3000, () => {
-  console.log("🚀 Server running on port 3000");
+server.listen(3030, () => {
+  console.log("🚀 Server running on port 3030");
 });
