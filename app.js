@@ -35,9 +35,9 @@ const sessionOptions = {
   cookie: {
     expires: Date.now() + 7 * 24 * 60 * 60 + 1000,
     maxAge: 7 * 24 * 60 * 60 + 1000,
-    httpOnly: true,
-    sameSite: "none",
-    secure: true
+  httpOnly: true,
+  secure: true,  // Change to `false` if testing on localhost without HTTPS
+  sameSite: 'strict'
   }
 }
 const server = http.createServer(app);
