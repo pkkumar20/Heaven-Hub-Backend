@@ -41,7 +41,10 @@ const sessionOptions = {
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "https://www.heven-hub.site/", // ✅ React frontend (Update if different)
+    origin: [
+  "https://heaven-hub-frontend-1.onrender.com",
+  "https://heaven-hub.site",
+], // ✅ React frontend (Update if different)
     methods: ["GET", "POST", "PATCH"],
     credentials: true,
   },
