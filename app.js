@@ -32,13 +32,14 @@ const sessionOptions = {
   secret: process.env.SECRET,
     resave: false,
   saveUninitialized: false,
-  cookie: {
-    expires: Date.now() + 7 * 24 * 60 * 60 + 1000,
-    maxAge: 7 * 24 * 60 * 60 + 1000,
+cookie: {
+  expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // ✅ Corrected
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 🛠 Fixed: Corrected `maxAge`
   httpOnly: true,
-  secure: true,  // Change to `false` if testing on localhost without HTTPS
-  sameSite: 'strict'
-  }
+  secure: process.env.NODE_ENV === "production", // ✅ Use secure only in production
+  sameSite: "lax", // ✅ Change to "lax" for better compatibility
+}
+
 }
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -58,7 +59,6 @@ app.use(
   })
 );
 
-// ✅ Ensure headers are set for all responses
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
@@ -71,6 +71,8 @@ app.use((req, res, next) => {
 
   next();
 });
+
+app.use(session(sessionOptions)); // ✅ CORS is now above session
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
