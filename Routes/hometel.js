@@ -24,6 +24,7 @@ const {
 module.exports = (io) => {
   const router = express.Router();
   router.get("/home", async (req, res) => {
+    console.log(req.isAuthenticated())
     try {
       const data = await hometels.find().populate("reviews");
       res.status(200).json({ success: true, hometels: data });
