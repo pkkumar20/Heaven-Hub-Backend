@@ -342,6 +342,7 @@ module.exports = (io) => {
   });
   router.post("/logout", (req, res) => {
     const userId = req.user.id;
+    
     req.logout((err) => {
       if (err) return res.status(500).json({ message: "Logout failed" });
       io.emit("authUpdate", { userId, authenticated: false });
