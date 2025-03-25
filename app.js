@@ -1,4 +1,5 @@
 require("dotenv").config();
+const isProduction = process.env.NODE_ENV === "production";
 const express = require("express");
 const mongoose = require("mongoose");
 const http = require("http");
@@ -27,20 +28,22 @@ const store = MongoStore.create(
 store.on("error", () => {
   console.log("This is error from mongo session store ",err)
 })
+
+
+app.set("trust proxy", 1); // ✅ Trust Render's proxy (needed for secure cookies)
+
 const sessionOptions = {
   store,
   secret: process.env.SECRET,
-    resave: false,
+  resave: false,
   saveUninitialized: false,
-cookie: {
-  expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // ✅ Corrected
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 🛠 Fixed: Corrected `maxAge`
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production", // ✅ Use secure only in production
-  sameSite: "lax", // ✅ Change to "lax" for better compatibility
-}
-
-}
+  cookie: {
+    httpOnly: true, 
+    secure: isProduction,  // ✅ Secure only in production
+    sameSite: isProduction ? "none" : "lax", // ✅ "none" for production, "lax" for local
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  }
+};
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
