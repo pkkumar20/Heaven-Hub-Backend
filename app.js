@@ -9,6 +9,7 @@ const passport = require("passport");
 const LocalStrategy = require("passport-local").Strategy;
 const cors = require("cors");
 const { Server } = require("socket.io");
+const rateLimit = require('express-rate-limit');
 
 // Import Models & Routes
 const User = require("./Models/User");
@@ -16,79 +17,82 @@ const Hometel = require("./Models/Hometels");
 const dataRoutes = require("./Routes/userData");
 
 const app = express();
+
+// Improved session store configuration
 const store = MongoStore.create({
   mongoUrl: process.env.ATLAS_URL,
-  crypto: { secret: process.env.SECRET },
+  crypto: { 
+    secret: process.env.SECRET 
+  },
   touchAfter: 24 * 3600,
+  autoRemove: 'interval',
+  autoRemoveInterval: 60 // minutes
 });
 
 store.on("error", (err) => {
-  console.log("This is error from mongo session store ", err);
+  console.error("Mongo session store error:", err);
 });
 
-app.set("trust proxy", 1); // ✅ Needed for secure cookies behind a proxy
+app.set("trust proxy", 1);
 
+// Enhanced session options
 const sessionOptions = {
   store,
+  name: 'heven-hub.sid', // Custom session cookie name
   secret: process.env.SECRET,
   resave: false,
   saveUninitialized: false,
+  rolling: true, // Reset maxAge on every request
   cookie: {
     httpOnly: true,
-    secure: isProduction, // ✅ Secure only in production
-    sameSite: isProduction ? "none" : "lax", // ✅ Required for cross-site cookies
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-  },
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  }
 };
 
+// Rate limiting for API endpoints
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 const server = http.createServer(app);
+
+// Improved Socket.IO configuration
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:3000","http://localhost:5173", "https://heven-hub.site"], // ✅ Correct frontend URL
+    origin: ["https://heven-hub.site" ,"http://localhost:3000"],
     methods: ["GET", "POST", "PATCH"],
-    credentials: true,
+    credentials: true
   },
-});
-
-// ✅ CORS Middleware
-app.use(
-  cors({
-    origin: ["http://localhost:3000","http://localhost:5173", "https://heven-hub.site"], // ✅ Correct frontend URL
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true, // ✅ Important for cookies & sessions
-  })
-);
-
-// ✅ Allow Preflight Requests
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
-  res.header(
-    "Access-Control-Allow-Methods",
-    "GET, POST, PUT, DELETE, PATCH, OPTIONS"
-  );
-  res.header(
-    "Access-Control-Allow-Headers",
-    "Origin, Content-Type, Authorization, Accept"
-  );
-  res.header("Access-Control-Allow-Credentials", "true");
-
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(200);
+  connectionStateRecovery: {
+    maxDisconnectionDuration: 2 * 60 * 1000, // 2 minutes
+    skipMiddlewares: true
   }
-
-  next();
 });
 
-// ✅ Session and Passport Setup
+// Simplified CORS configuration
+app.use(cors({
+  origin: ["https://heven-hub.site" ,"http://localhost:3000"],
+  credentials: true,
+  exposedHeaders: ['set-cookie']
+}));
+
+// Session and Passport setup
 app.use(session(sessionOptions));
 app.use(passport.initialize());
 app.use(passport.session());
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10kb' }));
+app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
-// ✅ Routes
+// Apply rate limiting to API routes
+app.use('/api/', apiLimiter);
+
+// Routes
 app.get("/", (req, res) => {
   res.status(200).json({ message: "working" });
 });
@@ -110,65 +114,110 @@ app.get("*", (req, res) => {
   res.status(404).json({ message: "Route not found" });
 });
 
-// ✅ MongoDB Connection
-mongoose
-  .connect(process.env.ATLAS_URL)
-  .then(() => console.log("Connected! to MongoDB"))
-  .catch((err) => console.log(err));
+// MongoDB Connection with improved settings
+mongoose.connect(process.env.ATLAS_URL, {
+  maxPoolSize: 10,
+  serverSelectionTimeoutMS: 5000,
+  socketTimeoutMS: 45000
+})
+.then(() => console.log("MongoDB connected successfully"))
+.catch(err => console.error("MongoDB connection error:", err));
 
-// ✅ Passport Authentication
-passport.use(new LocalStrategy(User.authenticate()));
-passport.serializeUser((user, done) => done(null, user.id));
+// Passport configuration
+passport.use(new LocalStrategy({
+  usernameField: 'email',
+  passReqToCallback: true
+}, User.authenticate()));
+
+passport.serializeUser((user, done) => {
+  done(null, user.id);
+});
+
 passport.deserializeUser(async (id, done) => {
   try {
-    const foundUser = await User.findById(id);
-    done(null, foundUser);
+    const user = await User.findById(id).select('-password -__v');
+    done(null, user);
   } catch (err) {
     done(err, null);
   }
 });
 
-// ✅ Socket.io for Real-time Updates
+// Enhanced Socket.IO implementation
 const onlineUsers = new Map();
+const socketAuthLimits = new Map();
+
+io.use((socket, next) => {
+  // Add rate limiting for socket events
+  const ip = socket.handshake.address;
+  const limit = socketAuthLimits.get(ip) || 0;
+  
+  if (limit > 5) { // Max 5 auth events per minute per IP
+    return next(new Error('Too many auth requests'));
+  }
+  
+  socketAuthLimits.set(ip, limit + 1);
+  setTimeout(() => {
+    const current = socketAuthLimits.get(ip) || 0;
+    socketAuthLimits.set(ip, Math.max(0, current - 1));
+  }, 60000);
+  
+  next();
+});
 
 io.on("connection", (socket) => {
   console.log("Client connected:", socket.id);
 
+  // Throttle auth updates
+  let lastAuthUpdate = 0;
+  
   socket.on("userLoggedIn", (userId) => {
+    const now = Date.now();
+    if (now - lastAuthUpdate < 5000) return; // 5 second cooldown
+    
+    lastAuthUpdate = now;
+    
     if (!onlineUsers.has(userId)) {
       onlineUsers.set(userId, new Set());
     }
     onlineUsers.get(userId).add(socket.id);
-
-    onlineUsers.get(userId).forEach((socketId) => {
-      io.to(socketId).emit("authUpdate", {
-        userId,
-        authenticated: true,
-      });
+    
+    // Only emit to this socket, not all sockets for the user
+    socket.emit("authUpdate", {
+      userId,
+      authenticated: true
     });
   });
 
   socket.on("userLoggedOut", (userId) => {
     if (onlineUsers.has(userId)) {
-      onlineUsers.get(userId).forEach((socketId) => {
-        io.to(socketId).emit("authUpdate", { userId, authenticated: false });
-      });
-      onlineUsers.delete(userId);
+      onlineUsers.get(userId).delete(socket.id);
+      if (onlineUsers.get(userId).size === 0) {
+        onlineUsers.delete(userId);
+      }
     }
+    socket.emit("authUpdate", { userId, authenticated: false });
   });
 
-  socket.on("disconnect", (reson) => {
-    console.log(`Socket disconnected: ${socket.id}`,reson);
-    for (let [userId, sockets] of onlineUsers.entries()) {
-      sockets.delete(socket.id);
-      if (sockets.size === 0) {
+  socket.on("disconnect", (reason) => {
+    console.log(`Socket disconnected (${reason}):`, socket.id);
+    for (const [userId, sockets] of onlineUsers.entries()) {
+      if (sockets.delete(socket.id) && sockets.size === 0) {
         onlineUsers.delete(userId);
       }
     }
   });
 });
 
-// ✅ Start Express Server
-server.listen(3030, () => {
-  console.log("🚀 Server running on port 3030");
+// Server startup
+server.listen(process.env.PORT || 3030, () => {
+  console.log(`Server running on port ${process.env.PORT || 3030}`);
+});
+
+// Cleanup on server shutdown
+process.on('SIGTERM', () => {
+  server.close(() => {
+    mongoose.connection.close(false, () => {
+      process.exit(0);
+    });
+  });
 });
