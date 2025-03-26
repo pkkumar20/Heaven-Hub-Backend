@@ -41,13 +41,10 @@ const sessionOptions = {
   },
 };
 
-const server = require("https").createServer({
-  key: fs.readFileSync("/path/to/privkey.pem"),
-  cert: fs.readFileSync("/path/to/fullchain.pem"),
-}, app);
+const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:3000", "https://heven-hub.site"], // ✅ Correct frontend URL
+    origin: ["http://localhost:3000","http://localhost:5173", "https://heven-hub.site"], // ✅ Correct frontend URL
     methods: ["GET", "POST", "PATCH"],
     credentials: true,
   },
@@ -56,7 +53,7 @@ const io = new Server(server, {
 // ✅ CORS Middleware
 app.use(
   cors({
-    origin: ["http://localhost:3000", "https://heven-hub.site"], // ✅ Correct frontend URL
+    origin: ["http://localhost:3000","http://localhost:5173", "https://heven-hub.site"], // ✅ Correct frontend URL
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true, // ✅ Important for cookies & sessions
