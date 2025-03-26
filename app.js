@@ -157,8 +157,8 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("disconnect", () => {
-    console.log(`Socket disconnected: ${socket.id}`);
+  socket.on("disconnect", (reson) => {
+    console.log(`Socket disconnected: ${socket.id}`,reson);
     for (let [userId, sockets] of onlineUsers.entries()) {
       sockets.delete(socket.id);
       if (sockets.size === 0) {
