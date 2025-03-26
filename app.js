@@ -47,7 +47,7 @@ const sessionOptions = {
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:3000", "https://heaven-hub.site","https://heaven-hub.up.railway.app"], // ✅ React frontend (Update if different)
+    origin: ["http://localhost:3000","https://heven-hub.site"], // ✅ React frontend (Update if different)
     methods: ["GET", "POST", "PATCH"],
     credentials: true,
   },
@@ -55,7 +55,7 @@ const io = new Server(server, {
 
 app.use(
   cors({
-    origin: ["http://localhost:3000", "https://heaven-hub.site","https://heaven-hub.up.railway.app"], // ✅ Allow localhost & live frontend
+    origin: ["http://localhost:3000","https://heven-hub.site"], // ✅ Allow localhost & live frontend
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true, // ✅ Important for cookies & sessions
