@@ -344,6 +344,7 @@ module.exports = (io) => {
     const userId = req.user.id;
     
     req.logout((err) => {
+      console.log("this is err ",err)
       if (err) return res.status(500).json({ message: "Logout failed" });
       io.emit("authUpdate", { userId, authenticated: false });
       res.clearCookie("connect.sid");
