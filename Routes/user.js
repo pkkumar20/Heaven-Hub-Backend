@@ -257,7 +257,7 @@ module.exports = (io) => {
       // Find user by username
       const foundUser = await user.findOne({ username });
       if (!foundUser) {
-        return res.status(400).json({ message: "No user found" });
+        return res.status(401).json({ message: "No user found" });
       }
 
       // Check if email is verified
@@ -341,10 +341,9 @@ module.exports = (io) => {
     }
   });
   router.post("/logout", (req, res) => {
-    const userId = req.user.id;
-    
+    const userId = req.user._id;
+    if (!req.user) return res.status(200).json({ message: 'No user to logout' });
     req.logout((err) => {
-      console.log("this is err ",err)
       if (err) return res.status(500).json({ message: "Logout failed" });
       io.emit("authUpdate", { userId, authenticated: false });
       res.clearCookie("connect.sid");
