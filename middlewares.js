@@ -51,20 +51,32 @@ module.exports.convertUser = (req, res, next) => {
 };
 module.exports.convertPhone = (req, res, next) => {
   try {
-    let data = req.body;
-    if (typeof req.body.userDetails === "string") {
-        data = JSON.parse(req.body);
-      } else {
-        data = req.body;
+    let data = req.body.userDetails;
+    
+    // Handle cases where userDetails might be a JSON string
+    if (req.body.userDetails && typeof req.body.userDetails === 'string') {
+      try {
+        data = JSON.parse(req.body.userDetails);
+      } catch (parseError) {
+        console.error("Error parsing userDetails:", parseError);
+        return res.status(400).json({
+          redirectUrl: `/`,
+          success: false,
+          message: "Invalid userDetails format",
+        });
       }
-    // Ensure phone number remains a string
-    if (typeof data.phoneNumber !== "string") {
-      data.phoneNumber = String(data.phoneNumber); // Convert to string if not already
     }
+
+    // Convert phoneNumber to string if it exists
+    if (data.phoneNumber !== undefined) {
+      data.phoneNumber = String(data.phoneNumber);
+    }
+    delete req.body.userDetails;
     req.body = data;
+    console.log(req.body)
     next();
   } catch (err) {
-    console.error("Error parsing userDetails:", err);
+    console.error("Error in convertPhone middleware:", err);
     return res.status(400).json({
       redirectUrl: `/`,
       success: false,

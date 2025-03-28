@@ -260,12 +260,7 @@ module.exports = (io) => {
         return res.status(401).json({ message: "No user found" });
       }
 
-      // Check if email is verified
-      if (!foundUser.isEmailVerified) {
-        return res
-          .status(400)
-          .json({ message: "Please verify your email first" });
-      }
+   
 
       // Use Passport to authenticate
       passport.authenticate("local", async (err, user, info) => {
@@ -275,7 +270,12 @@ module.exports = (io) => {
           return res
             .status(401)
             .json({ message: info?.message || "Unauthorized" });
-
+   // Check if email is verified
+      if (!foundUser.isEmailVerified) {
+        return res
+          .status(400)
+          .json({ message: "Please verify your email first" });
+      }
         req.logIn(user, async (err) => {
           if (err) return res.status(500).json({ message: "Login failed" });
 
@@ -340,16 +340,39 @@ module.exports = (io) => {
         .json({ message: "Internal server error", err: err.message });
     }
   });
-  router.post("/logout", (req, res) => {
-    const userId = req.user._id;
-    if (!req.user) return res.status(200).json({ message: 'No user to logout' });
-    req.logout((err) => {
-      if (err) return res.status(500).json({ message: "Logout failed" });
-      io.emit("authUpdate", { userId, authenticated: false });
-      res.clearCookie("connect.sid");
-      res.json({ message: "Logged out" });
+ router.get("/logout", (req, res) => {
+  if (!req.isAuthenticated()) {
+    return res.status(400).json({ success: false, message: "Not logged in" });
+  }
+
+  const userId = req.user?._id?.toString(); // Safe access
+
+  req.logout((err) => {
+    if (err) {
+      console.error("Logout error:", err);
+      return res.status(500).json({ success: false, message: "Logout failed" });
+    }
+
+    req.session.destroy((destroyErr) => {
+      if (destroyErr) {
+        console.error("Session destruction error:", destroyErr);
+        return res.status(500).json({ success: false, message: "Session cleanup failed" });
+      }
+
+      res.clearCookie("connect.sid")
+        .status(200)
+        .json({
+          success: true,
+          message: "Logged out successfully",
+          redirectUrl: "/"
+        });
+
+      if (userId) {
+        io.emit("authUpdate", { userId, authenticated: false });
+      }
     });
   });
+});
   router.post(
     "/reset-password",
     upload.none(),
@@ -517,14 +540,11 @@ module.exports = (io) => {
   });
   // add favorite hometels
   router.post("/favorite/add", upload.none(), isLoggedIn, async (req, res) => {
-    if (!mongoose.Types.ObjectId.isValid(req.body.userId)) {
-      return res.status(400).json({ message: "Invalid User ID" });
-    }
     if (!mongoose.Types.ObjectId.isValid(req.body.hometelId)) {
       return res.status(400).json({ message: "Invalid Hometel ID" });
     }
     try {
-      let User = await user.findById(req.body.userId);
+      let User = await user.findById(req.user._id);
       let Hometels = await hometels.findById(req.body.hometelId);
 
       if (User === null && Hometels === null) {
@@ -532,14 +552,14 @@ module.exports = (io) => {
       } else {
         let newUser = await user
           .findByIdAndUpdate(
-            req.body.userId,
+            req.user._id,
             { $addToSet: { favoriteHometels: Hometels._id } }, // Prevents duplicates
             { new: true }
           )
           .populate("favoriteHometels");
         // Emit real-time update to all browsers where user is logged in
         io.emit("favoriteUpdated", {
-          userId: req.body.userId,
+          userId: req.user._id,
           favorites: newUser.favoriteHometels,
         });
         res.status(200).json({
@@ -558,15 +578,12 @@ module.exports = (io) => {
     upload.none(),
     isLoggedIn,
     async (req, res) => {
-      if (!mongoose.Types.ObjectId.isValid(req.body.userId)) {
-        return res.status(400).json({ message: "Invalid User ID" });
-      }
       if (!mongoose.Types.ObjectId.isValid(req.body.hometelId)) {
         return res.status(400).json({ message: "Invalid Hometel ID" });
       }
       try {
         // Find User & Hometel
-        const User = await user.findById(req.body.userId);
+        const User = await user.findById(req.user._id);
         const Hometel = await hometels.findById(req.body.hometelId);
 
         // If either user or hometel does not exist
@@ -577,14 +594,14 @@ module.exports = (io) => {
         // Remove Hometel from user's favorites
         const updatedUser = await user
           .findByIdAndUpdate(
-            req.body.userId,
+            req.user._id,
             { $pull: { favoriteHometels: req.body.hometelId } }, // Removes the hometel ID
             { new: true }
           )
           .populate("favoriteHometels");
         // Emit real-time update to all browsers where user is logged in
         io.emit("favoriteUpdated", {
-          userId: req.body.userId,
+          userId: req.user._id,
           favorites: updatedUser.favoriteHometels,
         });
         res.status(200).json({
@@ -601,56 +618,105 @@ module.exports = (io) => {
   );
   // delete user
 
-  router.delete("/:id", async (req, res) => {
-    try {
-      const { id } = req.params;
+router.delete("/:id", async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-      // Validate if ID is a valid ObjectId
-      if (!mongoose.Types.ObjectId.isValid(id)) {
-        return res.status(400).json({ message: "Invalid User ID" });
-      }
+  try {
+    const { id } = req.params;
 
-      // Find the user
-      const foundUser = await user.findById(id);
-      if (!foundUser) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      // Pull out all reservation IDs from Hometel
-      await hometels.updateMany(
-        { reservations: { $exists: true } },
-        { $pull: { reservations: { $in: foundUser.reservations } } }
-      );
-      // Step 2: Delete all reservations related to this user
-      await reserv.deleteMany({ _id: { $in: foundUser.reservations } });
-      // Delete associated reviews
-      if (foundUser.reviews && foundUser.reviews.length > 0) {
-        await review.deleteMany({ _id: { $in: foundUser.reviews } });
-      }
-
-      // Delete associated hometels
-      await hometels.deleteMany({ owner: id });
-
-      // Destroy session if the logged-in user is deleted
-      if (req.user && req.user._id.toString() === id) {
-        req.logout((err) => {
-          if (err) return res.status(500).json({ message: "Logout failed" });
-
-          req.session.destroy((err) => {
-            if (err)
-              return res
-                .status(500)
-                .json({ message: "Session destruction failed" });
-          });
-        });
-      }
-      // Delete the user
-      const delUser = await user.findByIdAndDelete(id);
-      res.status(200).json({ message: "User Deleted Sucessfully" });
-    } catch (err) {
-      console.log(err);
-      return res.status(500).json({ message: "Internal Server Error" });
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid User ID" });
     }
-  });
+
+    const foundUser = await user.findById(id).session(session);
+    if (!foundUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Check if we're deleting the currently logged-in user
+    const isSelfDelete = req.user?._id.toString() === id;
+    // hometels
+   // Find all hometels owned by this user
+    const Hometels = await hometels.find({ owner: foundUser._id });
+    
+    // For each hometel, delete related data
+    for (const Hometel of Hometels) {
+      // Delete all reviews for this hometel
+      const Reviews = await review.find({ createdFor: Hometel._id });
+      
+      // Find all reservations for this hometel
+      const reservations = await reserv.find({ reservFor: Hometel._id });
+      
+      // For each reservation, remove reference from the reserving user
+      for (const reservation of reservations) {
+        await user.updateOne(
+          { _id: reservation.reservBy },
+          { $pull: { reservations: reservation._id } }
+        );
+      }
+      
+      // For each review, remove reference from the reviewing user
+      for (const Review of Reviews) {
+        await user.updateOne(
+          { _id: Review.createdBy },
+          { $pull: { reviews: Review._id } }
+        );
+      }
+      
+      // Delete all reservations for this hometel
+      await reserv.deleteMany({ reservFor: Hometel._id });
+      // Delete all reviews for this hometel
+      await review.deleteMany({ createdFor: Hometel._id });
+      // Remove hometel from all users' favorites
+      await user.updateMany(
+        { favoriteHometels: Hometel._id },
+        { $pull: { favoriteHometels: Hometel._id } }
+      );
+    }
+    
+    // Delete all related data
+    await Promise.all([
+      reserv.deleteMany({ _id: { $in: foundUser.reservations } }, { session }),
+      review.deleteMany({ _id: { $in: foundUser.reviews } }, { session }),
+      hometels.deleteMany({ owner: id }, { session }),
+      user.findByIdAndDelete(id, { session })
+    ]);
+
+    await session.commitTransaction();
+
+    if (isSelfDelete) {
+      // Manually clear the session for self-deletion
+      req.session.destroy((err) => {
+        if (err) {
+          console.error("Session destruction error:", err);
+          return res.status(500).json({ message: "Session cleanup failed" });
+        }
+        
+        // Clear the cookie and send response
+        res.clearCookie('connect.sid')
+           .status(200)
+           .json({ 
+             message: "Account deleted successfully",
+             redirectUrl: "/",
+             logout: true
+           });
+        
+        // Notify clients via socket.io
+        io.emit("authUpdate", { userId: id, authenticated: false });
+      });
+    } else {
+      res.status(200).json({ message: "User deleted successfully" });
+    }
+
+  } catch (err) {
+    await session.abortTransaction();
+    console.error("Delete error:", err);
+    res.status(500).json({ message: "Internal server error" });
+  } finally {
+    session.endSession();
+  }
+});
 
   return router;
 };
