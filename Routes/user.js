@@ -312,66 +312,68 @@ module.exports = (io) => {
   });
 
   // logout
-  router.get("/logout", (req, res) => {
-    try {
-      if (req.isAuthenticated()) {
-        const userId = req.user._id.toString();
+ router.post("/logout", async (req, res) => {
+  try {
+    if (!req.isAuthenticated()) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "User not logged in" 
+      });
+    }
 
-        req.logout((err) => {
-          if (err) {
-            return res
-              .status(400)
-              .json({ success: false, message: "Logout failed" });
-          }
-          io.emit("authUpdate", { userId, authenticated: false });
-          res.clearCookie("connect.sid");
-          res.status(200).json({
-            success: true,
-            message: "You logged out successfully",
-            redirectUrl: "/",
-          });
+    const userId = req.user._id.toString();
+    
+    // Step 1: Logout using Passport
+    req.logout(async (err) => {
+      if (err) {
+        console.error("Passport logout error:", err);
+        return res.status(500).json({ 
+          success: false, 
+          message: "Passport logout failed" 
         });
-      } else {
-        res.status(400).json({ message: "User not logged in" });
-      }
-    } catch (err) {
-      res
-        .status(400)
-        .json({ message: "Internal server error", err: err.message });
-    }
-  });
- router.get("/logout", (req, res) => {
-  if (!req.isAuthenticated()) {
-    return res.status(400).json({ success: false, message: "Not logged in" });
-  }
-
-  const userId = req.user?._id?.toString(); // Safe access
-
-  req.logout((err) => {
-    if (err) {
-      console.error("Logout error:", err);
-      return res.status(500).json({ success: false, message: "Logout failed" });
-    }
-
-    req.session.destroy((destroyErr) => {
-      if (destroyErr) {
-        console.error("Session destruction error:", destroyErr);
-        return res.status(500).json({ success: false, message: "Session cleanup failed" });
       }
 
-      res.clearCookie("connect.sid")
-        .status(200)
-        .json({
+      // Step 2: Destroy the session
+      req.session.destroy((err) => {
+        if (err) {
+          console.error("Session destruction error:", err);
+          return res.status(500).json({ 
+            success: false, 
+            message: "Session destruction failed" 
+          });
+        }
+
+        // Step 3: Clear the cookie
+        res.clearCookie("connect.sid", {
+          path: "/",
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+          domain: process.env.COOKIE_DOMAIN || undefined // Add if using custom domains
+        });
+
+        // Step 4: Notify via Socket.IO if available
+        if (io) {
+          io.emit("authUpdate", { userId, authenticated: false });
+        }
+
+        // Final response
+        res.status(200).json({
           success: true,
           message: "Logged out successfully",
           redirectUrl: "/"
         });
-
-      if (userId) {
-        io.emit("authUpdate", { userId, authenticated: false });
-      }
+      });
     });
-  });
+    
+  } catch (err) {
+    console.error("Unexpected logout error:", err);
+    res.status(500).json({ 
+      success: false, 
+      message: "Internal server error", 
+      error: err.message 
+    });
+  }
 });
   router.post(
     "/reset-password",
