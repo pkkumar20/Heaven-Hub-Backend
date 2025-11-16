@@ -34,7 +34,8 @@ const allowedOrigins = [
   "http://localhost:5173", 
   "https://heven-hub.site",
   "https://www.heven-hub.site",
-  "https://api.heven-hub.site"
+  "https://api.heven-hub.site",
+  "https://heaven-hub-frontend.onrender.com"
 ];
 
 const sessionOptions = {
