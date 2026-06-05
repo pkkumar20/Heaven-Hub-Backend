@@ -17,8 +17,8 @@ const { resetPassEmailOtp, newUseremailOtp } = require("../emailMiddleware");
 // Create a transporter object using the default SMTP transport
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
-  port: 2525,
-  secure: false, // Must be false for port 2525
+  port: 587,
+  secure: false, // Must be false for port 587 (STARTTLS)
   auth: {
     user: process.env.GMAIL,
     pass: process.env.PASSWORD,
@@ -137,7 +137,7 @@ module.exports = (io) => {
         let mailOptions = newUseremailOtp(userDetails.email, otp);
         transporter.sendMail(mailOptions, (error, info) => {
           if (error) {
-            console.log(error);
+            console.log("in new user:", error);
             return res.status(404).json({
               message: "Error sending OTP",
             });
@@ -146,7 +146,7 @@ module.exports = (io) => {
         });
       }
     } catch (err) {
-      console.log(err);
+      console.log("in new user:", err);
       res
         .status(400)
         .json({ message: "Internal server error", err: err.message });
