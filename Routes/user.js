@@ -137,6 +137,7 @@ module.exports = (io) => {
         let mailOptions = newUseremailOtp(userDetails.email, otp);
         transporter.sendMail(mailOptions, (error, info) => {
           if (error) {
+               console.log(error)
             return res.status(404).json({
               message: "Error sending OTP",
             });
@@ -165,6 +166,7 @@ module.exports = (io) => {
         let mailOptions = resetPassEmailOtp(email, otp, User.fullname);
         transporter.sendMail(mailOptions, (error, info) => {
           if (error) {
+               console.log(error)
             return res.status(404).json({
               message: "Error sending OTP",
             });
@@ -183,6 +185,7 @@ module.exports = (io) => {
           let mailOptions = newUseremailOtp(email, otp);
           transporter.sendMail(mailOptions, (error, info) => {
             if (error) {
+                 console.log(error)
               return res.status(404).json({
                 message: "Error sending OTP",
               });
@@ -403,6 +406,7 @@ module.exports = (io) => {
             let mailOptions = resetPassEmailOtp(email, otp, userName);
             transporter.sendMail(mailOptions, (error, info) => {
               if (error) {
+                   console.log(error)
                 return res.status(404).json({
                   message: "Error sending OTP",
                 });
