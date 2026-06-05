@@ -30,6 +30,7 @@ app.set("trust proxy", 1);
 
 // Define allowed origins for both environments
 const allowedOrigins = [
+  "https://heavenhub.qzz.io/",
   "http://localhost:3000",
   "http://localhost:5173", 
   "https://heven-hub.site",
