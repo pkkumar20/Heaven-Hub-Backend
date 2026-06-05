@@ -1,6 +1,6 @@
 module.exports.resetPassEmailOtp = (email, otp, name) => {
   return {
-    from: process.env.GMAIL,
+    from: `"Heaven-Hub" <contact@yourcustomdomain.com>`,
     to: email,
     subject: "Forget Password",
     html: `
@@ -215,7 +215,7 @@ module.exports.resetPassEmailOtp = (email, otp, name) => {
 };
 module.exports.newUseremailOtp = (email, otp) => {
   return {
-    from: process.env.GMAIL,
+    from: `"Heaven-Hub" <contact@yourcustomdomain.com>`,
     to: email,
     subject: "Email Verification",
     html: `
