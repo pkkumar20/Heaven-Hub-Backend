@@ -16,7 +16,9 @@ const nodemailer = require("nodemailer");
 const { resetPassEmailOtp, newUseremailOtp } = require("../emailMiddleware");
 // Create a transporter object using the default SMTP transport
 const transporter = nodemailer.createTransport({
-  service: "gmail", // Use Gmail's SMTP service
+  host: process.env.EMAIL_HOST,
+  port: parseInt(process.env.EMAIL_PORT),
+  // service: "gmail", // Use Gmail's SMTP service
   auth: {
     user: process.env.GMAIL, // Your email address
     pass: process.env.PASSWORD, // Your email password (consider using OAuth for security)
@@ -135,6 +137,7 @@ module.exports = (io) => {
         let mailOptions = newUseremailOtp(userDetails.email, otp);
         transporter.sendMail(mailOptions, (error, info) => {
           if (error) {
+               console.log(error)
             return res.status(404).json({
               message: "Error sending OTP",
             });
@@ -163,6 +166,7 @@ module.exports = (io) => {
         let mailOptions = resetPassEmailOtp(email, otp, User.fullname);
         transporter.sendMail(mailOptions, (error, info) => {
           if (error) {
+               console.log(error)
             return res.status(404).json({
               message: "Error sending OTP",
             });
@@ -181,6 +185,7 @@ module.exports = (io) => {
           let mailOptions = newUseremailOtp(email, otp);
           transporter.sendMail(mailOptions, (error, info) => {
             if (error) {
+                 console.log(error)
               return res.status(404).json({
                 message: "Error sending OTP",
               });
@@ -401,6 +406,7 @@ module.exports = (io) => {
             let mailOptions = resetPassEmailOtp(email, otp, userName);
             transporter.sendMail(mailOptions, (error, info) => {
               if (error) {
+                   console.log(error)
                 return res.status(404).json({
                   message: "Error sending OTP",
                 });
