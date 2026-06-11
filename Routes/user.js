@@ -12,18 +12,10 @@ const passport = require("passport");
 const { storage } = require("../cloudConfig");
 const multer = require("multer");
 const upload = multer({ storage });
-const nodemailer = require("nodemailer");
+const { sendMail: gmailSendMail } = require("../gmailMailer");
 const { resetPassEmailOtp, newUseremailOtp } = require("../emailMiddleware");
-// Create a transporter object using the default SMTP transport
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false, // Must be false for port 587 (STARTTLS)
-  auth: {
-    user: process.env.GMAIL,
-    pass: process.env.PASSWORD,
-  },
-});
+// Gmail API mailer (drop-in replacement for nodemailer/brevo transporter)
+const transporter = { sendMail: gmailSendMail };
 const {
   priceConvert,
   validateListing,
@@ -192,7 +184,7 @@ module.exports = (io) => {
             }
             res.status(200).json({ status: "ok", token: token });
           });
-        } catch (err) {}
+        } catch (err) { }
       }
     } else {
       res.status(404).json({ status: "error", message: "User not found" });
